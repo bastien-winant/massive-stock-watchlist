@@ -157,6 +157,7 @@
       border-bottom: 1px solid #e2e8f0;
       color: #4a5568;
       font-size: 14px;
+      vertical-align: middle;
     }
     
     tbody tr {
@@ -169,6 +170,41 @@
     
     tbody tr:last-child td {
       border-bottom: none;
+    }
+    
+    td:last-child {
+      text-align: center;
+    }
+    
+    th:last-child {
+      text-align: center;
+    }
+    
+    .delete-btn {
+      background: #f56565;
+      color: white;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 0;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    
+    .delete-btn:hover {
+      background: #e53e3e;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(245, 101, 101, 0.3);
+    }
+    
+    .delete-btn:active {
+      transform: translateY(0);
     }
     
     @media (max-width: 768px) {
@@ -214,6 +250,7 @@
         <th>Email</th>
         <th>Latest price</th>
         <th>Updated</th>
+        <th>Actions</th>
       </tr>
     </thead>
     <tbody id="watchlist-body"></tbody>
@@ -239,7 +276,18 @@
             ? Number(row.latest_price).toFixed(2)
             : "-";
           const updated = row.updated_at ? new Date(row.updated_at).toLocaleString() : "-";
-          tr.innerHTML = `<td>${row.symbol}</td><td>${row.email || "-"}</td><td>${price}</td><td>${updated}</td>`;
+          tr.innerHTML = `
+            <td>${row.symbol}</td>
+            <td>${row.email || "-"}</td>
+            <td>${price}</td>
+            <td>${updated}</td>
+            <td><button class="delete-btn" data-symbol="${row.symbol}">Remove</button></td>
+          `;
+          
+          // Add click handler to the delete button
+          const deleteBtn = tr.querySelector(".delete-btn");
+          deleteBtn.addEventListener("click", () => deleteFromWatchlist(row.symbol));
+          
           watchlistBody.appendChild(tr);
         });
       } catch (err) {
@@ -270,6 +318,29 @@
         resultEl.textContent = "Request failed: " + err;
       }
     });
+
+    async function deleteFromWatchlist(symbol) {
+      if (!confirm(`Are you sure you want to remove ${symbol} from your watchlist?`)) {
+        return;
+      }
+      
+      resultEl.textContent = `Removing ${symbol}...`;
+      
+      try {
+        const resp = await fetch(`/watchlist/${symbol}`, {
+          method: "DELETE",
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          resultEl.textContent = "Error: " + (data.error || resp.statusText);
+          return;
+        }
+        resultEl.textContent = `Removed ${symbol} from watchlist`;
+        loadWatchlist();
+      } catch (err) {
+        resultEl.textContent = "Request failed: " + err;
+      }
+    }
 
     loadWatchlist();
   </script>
