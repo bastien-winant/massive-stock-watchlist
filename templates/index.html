@@ -171,18 +171,28 @@
       border-bottom: none;
     }
     
+    td:last-child {
+      text-align: center;
+      vertical-align: middle;
+    }
+    
+    th:last-child {
+      text-align: center;
+    }
+    
     .delete-btn {
       background: #f56565;
       color: white;
       border: none;
-      padding: 6px 12px;
+      padding: 8px 16px;
       border-radius: 6px;
       cursor: pointer;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
       transition: all 0.2s ease;
       text-transform: uppercase;
       letter-spacing: 0.5px;
+      display: inline-block;
     }
     
     .delete-btn:hover {
@@ -268,7 +278,7 @@
             <td>${row.email || "-"}</td>
             <td>${price}</td>
             <td>${updated}</td>
-            <td><button class="delete-btn" data-symbol="${row.symbol}">Delete</button></td>
+            <td><button class="delete-btn" data-symbol="${row.symbol}">Remove</button></td>
           `;
           
           // Add click handler to the delete button
