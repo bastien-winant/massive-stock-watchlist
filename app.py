@@ -28,6 +28,7 @@ _w = WorkspaceClient()
 
 TABLE_NAME = os.environ.get("MASSIVE_TABLE_NAME", "massive_records")
 WATCHLIST_TABLE_NAME = os.environ.get("WATCHLIST_TABLE_NAME", "watchlist")
+TICKER_NEWS_TABLE_NAME = os.environ.get("TICKER_NEWS_TABLE_NAME", "ticker_news")
 
 # Basic stock ticker shape check: 1-10 uppercase letters, with an optional
 # ".X" or ".XX" share-class suffix (e.g. "BRK.B"). This rejects obviously
@@ -170,6 +171,83 @@ def delete_from_watchlist(symbol):
     )
     
     return jsonify({"symbol": symbol, "deleted": True})
+
+
+@app.route("/news/<symbol>", methods=["GET"])
+def get_ticker_news(symbol):
+    """
+    Retrieve stored news for a ticker symbol from the database.
+    """
+    ensure_ticker_news_table()
+    symbol = symbol.strip().upper()
+    
+    if not symbol or not _TICKER_RE.match(symbol):
+        return jsonify({"error": f"Invalid ticker symbol: {symbol!r}"}), 400
+    
+    rows = lakebase.run_query(
+        f"""
+        SELECT id, symbol, title, author, published_utc, article_url, 
+               image_url, description, fetched_at
+        FROM {TICKER_NEWS_TABLE_NAME}
+        WHERE symbol = %s
+        ORDER BY published_utc DESC
+        LIMIT 20
+        """,
+        (symbol,),
+    )
+    return jsonify(rows)
+
+
+@app.route("/news/<symbol>/fetch", methods=["POST"])
+def fetch_ticker_news(symbol):
+    """
+    Fetch fresh news for a ticker from the Massive API and store it.
+    """
+    ensure_ticker_news_table()
+    symbol = symbol.strip().upper()
+    
+    if not symbol or not _TICKER_RE.match(symbol):
+        return jsonify({"error": f"Invalid ticker symbol: {symbol!r}"}), 400
+    
+    client = MassiveClient()
+    try:
+        data = client.get_ticker_news(symbol, limit=10)
+    except requests.HTTPError as e:
+        return jsonify({"error": f"Failed to fetch news: {str(e)}"}), 400
+    
+    results = data.get("results", [])
+    if not results:
+        return jsonify({"symbol": symbol, "news_count": 0, "message": "No news found"})
+    
+    # Store news in the database
+    count = 0
+    for article in results:
+        article_id = article.get("id") or str(article.get("published_utc", "")) + symbol
+        title = article.get("title", "")
+        author = article.get("author", "")
+        published_utc = article.get("published_utc")
+        article_url = article.get("article_url", "")
+        image_url = article.get("image_url", "")
+        description = article.get("description", "")
+        
+        lakebase.run_write(
+            f"""
+            INSERT INTO {TICKER_NEWS_TABLE_NAME} 
+                (id, symbol, title, author, published_utc, article_url, image_url, description, fetched_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, now())
+            ON CONFLICT (id) DO UPDATE
+                SET title = EXCLUDED.title,
+                    author = EXCLUDED.author,
+                    article_url = EXCLUDED.article_url,
+                    image_url = EXCLUDED.image_url,
+                    description = EXCLUDED.description,
+                    fetched_at = EXCLUDED.fetched_at
+            """,
+            (article_id, symbol, title, author, published_utc, article_url, image_url, description),
+        )
+        count += 1
+    
+    return jsonify({"symbol": symbol, "news_count": count})
 
 
 @app.route("/watchlist", methods=["POST"])

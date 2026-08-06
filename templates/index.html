@@ -207,6 +207,142 @@
       transform: translateY(0);
     }
     
+    .news-btn {
+      background: #4299e1;
+      color: white;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 0;
+      margin-right: 8px;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    
+    .news-btn:hover {
+      background: #3182ce;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(66, 153, 225, 0.3);
+    }
+    
+    .news-btn:active {
+      transform: translateY(0);
+    }
+    
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+    }
+    
+    .modal-content {
+      background: white;
+      margin: 5% auto;
+      padding: 0;
+      border-radius: 16px;
+      width: 90%;
+      max-width: 800px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-height: 80vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .modal-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 24px 32px;
+      border-radius: 16px 16px 0 0;
+    }
+    
+    .modal-header h2 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 700;
+    }
+    
+    .close {
+      color: white;
+      float: right;
+      font-size: 32px;
+      font-weight: 700;
+      line-height: 1;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+    
+    .close:hover {
+      transform: scale(1.1);
+    }
+    
+    .modal-body {
+      padding: 32px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    
+    .news-item {
+      margin-bottom: 24px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    
+    .news-item:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+    
+    .news-item h3 {
+      margin: 0 0 12px 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: #1a202c;
+    }
+    
+    .news-item h3 a {
+      color: #667eea;
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+    
+    .news-item h3 a:hover {
+      color: #764ba2;
+    }
+    
+    .news-meta {
+      color: #718096;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+    
+    .news-description {
+      color: #4a5568;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #718096;
+      font-size: 16px;
+    }
+    
     @media (max-width: 768px) {
       body {
         padding: 20px 16px;
@@ -256,6 +392,19 @@
     <tbody id="watchlist-body"></tbody>
   </table>
 
+  <!-- News Modal -->
+  <div id="newsModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="close">&times;</span>
+        <h2 id="modal-title">News</h2>
+      </div>
+      <div class="modal-body" id="modal-body">
+        <div class="loading">Loading news...</div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const form = document.getElementById("stock-form");
     const resultEl = document.getElementById("result");
@@ -281,7 +430,10 @@
             <td>${row.email || "-"}</td>
             <td>${price}</td>
             <td>${updated}</td>
-            <td><button class="delete-btn" data-symbol="${row.symbol}">Remove</button></td>
+            <td>
+              <button class="news-btn" data-symbol="${row.symbol}">News</button>
+              <button class="delete-btn" data-symbol="${row.symbol}">Remove</button>
+            </td>
           `;
           
           // Add click handler to the delete button
@@ -319,6 +471,62 @@
       }
     });
 
+    async function showNews(symbol) {
+      const modal = document.getElementById("newsModal");
+      const modalTitle = document.getElementById("modal-title");
+      const modalBody = document.getElementById("modal-body");
+      
+      modal.style.display = "block";
+      modalTitle.textContent = `${symbol} News`;
+      modalBody.innerHTML = '<div class="loading">Fetching latest news...</div>';
+      
+      try {
+        // First, fetch fresh news from the API
+        const fetchResp = await fetch(`/news/${symbol}/fetch`, {
+          method: "POST",
+        });
+        
+        if (!fetchResp.ok) {
+          const fetchData = await fetchResp.json();
+          modalBody.innerHTML = `<div class="loading">Error: ${fetchData.error || fetchResp.statusText}</div>`;
+          return;
+        }
+        
+        // Then retrieve the stored news
+        const resp = await fetch(`/news/${symbol}`);
+        const data = await resp.json();
+        
+        if (!resp.ok) {
+          modalBody.innerHTML = `<div class="loading">Error: ${data.error || resp.statusText}</div>`;
+          return;
+        }
+        
+        if (!data || data.length === 0) {
+          modalBody.innerHTML = '<div class="loading">No news found for this ticker.</div>';
+          return;
+        }
+        
+        // Display news articles
+        let html = '';
+        data.forEach((article) => {
+          const publishedDate = article.published_utc ? new Date(article.published_utc).toLocaleString() : 'Unknown date';
+          html += `
+            <div class="news-item">
+              <h3><a href="${article.article_url || '#'}" target="_blank">${article.title || 'Untitled'}</a></h3>
+              <div class="news-meta">
+                ${article.author ? `By ${article.author} | ` : ''}${publishedDate}
+              </div>
+              ${article.description ? `<div class="news-description">${article.description}</div>` : ''}
+            </div>
+          `;
+        });
+        modalBody.innerHTML = html;
+        
+      } catch (err) {
+        modalBody.innerHTML = `<div class="loading">Request failed: ${err}</div>`;
+      }
+    }
+
     async function deleteFromWatchlist(symbol) {
       if (!confirm(`Are you sure you want to remove ${symbol} from your watchlist?`)) {
         return;
@@ -339,6 +547,20 @@
         loadWatchlist();
       } catch (err) {
         resultEl.textContent = "Request failed: " + err;
+      }
+    }
+
+    // Modal close functionality
+    const modal = document.getElementById("newsModal");
+    const closeBtn = document.querySelector(".close");
+    
+    closeBtn.onclick = function() {
+      modal.style.display = "none";
+    }
+    
+    window.onclick = function(event) {
+      if (event.target == modal) {
+        modal.style.display = "none";
       }
     }
 
