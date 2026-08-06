@@ -436,7 +436,10 @@
             </td>
           `;
           
-          // Add click handler to the delete button
+          // Add click handlers to the buttons
+          const newsBtn = tr.querySelector(".news-btn");
+          newsBtn.addEventListener("click", () => showNews(row.symbol));
+          
           const deleteBtn = tr.querySelector(".delete-btn");
           deleteBtn.addEventListener("click", () => deleteFromWatchlist(row.symbol));
           
